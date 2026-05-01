@@ -54,12 +54,18 @@ body {
 }
 
 .card .card-inner {
-  opacity: 0;
-  transform: translateY(30px);
+  opacity: 1;
+  transform: translateY(0);
   transition: opacity 0.8s cubic-bezier(0.4, 0, 0.2, 1), transform 0.8s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-.card.visible .card-inner {
+/* ScrollRevealが制御: 初期化後に隠し、交差時に表示 */
+.card.scroll-init .card-inner {
+  opacity: 0;
+  transform: translateY(30px);
+}
+
+.card.scroll-init.visible .card-inner {
   opacity: 1;
   transform: translateY(0);
 }
