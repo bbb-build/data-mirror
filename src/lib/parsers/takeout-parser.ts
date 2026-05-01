@@ -219,6 +219,16 @@ export async function parseTakeoutZip(
     locations.push(...parseLocationJson(content));
   }
 
+  // 認識可能なデータが1つも見つからない場合はエラー
+  const totalFound = watchHistory.length + searchHistory.length + chromeHistory.length
+    + searchActivity.length + fitDays.length + payments.length + locations.length;
+  if (totalFound === 0) {
+    throw new Error(
+      "このファイルからGoogle Takeoutのデータを検出できませんでした。\n" +
+      "YouTube視聴履歴（HTML/JSON）、Chrome閲覧履歴、Google検索履歴などが含まれるZIPをアップロードしてください。"
+    );
+  }
+
   return aggregateData({
     watchHistory,
     searchHistory,
@@ -338,6 +348,16 @@ async function parseIndividualFiles(
       }
     }
     processed++;
+  }
+
+  // 認識可能なデータが1つも見つからない場合はエラー
+  const totalFound = raw.watchHistory.length + raw.searchHistory.length + raw.chromeHistory.length
+    + raw.searchActivity.length + raw.fitDays.length + raw.payments.length + raw.locations.length;
+  if (totalFound === 0) {
+    throw new Error(
+      "アップロードされたファイルからデータを検出できませんでした。\n" +
+      "Google Takeoutの視聴履歴（HTML/JSON）、Chrome閲覧履歴などのファイルを選択してください。"
+    );
   }
 
   return aggregateData(raw, onProgress);

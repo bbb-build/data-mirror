@@ -31,8 +31,9 @@ function TakeoutGuide() {
       { name: "Google Pay", note: "任意 — 決済履歴" },
       { name: "ロケーション履歴", note: "任意 — 位置情報" },
     ]},
-    { label: "4", text: "「次のステップ」→「エクスポートを作成」", sub: "ZIPファイルの準備が始まる" },
-    { label: "5", text: "メールでダウンロードリンクが届く", sub: "データ量により数分〜数時間" },
+    { label: "4", text: "Google画面で「次のステップ」→「エクスポートを作成」", sub: "Googleがあなたのデータを1つのZIPにまとめる" },
+    { label: "5", text: "Googleからメールが届く", sub: "ZIPのダウンロードリンク付き（数分〜数時間）" },
+    { label: "6", text: "ダウンロードしたZIPをこの画面にドロップ", sub: "Data Mirrorが解析します" },
     { label: "💡", text: "ZIPが大きすぎる場合", sub: "解凍して個別ファイル（HTML/JSON/CSV）を直接アップロードできます" },
   ];
 
