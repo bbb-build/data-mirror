@@ -136,7 +136,9 @@ export default function AlgorithmCard({ algorithmRate, youtube, subscriptions }:
     ctx.fillText("CONTROLLED", cx + Math.cos(ctrlAngle) * labelR, cy + Math.sin(ctrlAngle) * labelR);
   }, [algorithmRate]);
 
-  const selfWillPercent = ((youtube.searchCount / youtube.totalViews) * 100).toFixed(1);
+  const selfWillPercent = youtube.totalViews > 0
+    ? ((youtube.searchCount / youtube.totalViews) * 100).toFixed(1)
+    : "0.0";
 
   return (
     <section className="card" id="card2">

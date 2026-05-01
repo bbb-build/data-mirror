@@ -25,6 +25,7 @@ export default function RhythmCard({ heatmap, peakHour, nocturnalIndex }: Rhythm
 
     let maxVal = 0;
     heatmap.forEach(row => row.forEach(v => { if (v > maxVal) maxVal = v; }));
+    if (maxVal === 0) maxVal = 1; // ゼロ除算防止
 
     // Background glow
     const bgGrad = ctx.createRadialGradient(cx, cy, innerR - 20, cx, cy, outerR + 40);
@@ -80,7 +81,7 @@ export default function RhythmCard({ heatmap, peakHour, nocturnalIndex }: Rhythm
 
     // Hour labels
     ctx.fillStyle = "#a0aac4";
-    ctx.font = '500 11px "JetBrains Mono"';
+    ctx.font = '500 11px "JetBrains Mono", monospace';
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
     for (let h = 0; h < 24; h += 3) {
@@ -90,7 +91,7 @@ export default function RhythmCard({ heatmap, peakHour, nocturnalIndex }: Rhythm
     }
 
     // Day labels
-    ctx.font = '500 10px "JetBrains Mono"';
+    ctx.font = '500 10px "JetBrains Mono", monospace';
     ctx.fillStyle = "#4a5578";
     for (let d = 0; d < 7; d++) {
       const r = innerR + ((d + 0.5) / 7) * (outerR - innerR);

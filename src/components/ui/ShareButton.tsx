@@ -115,7 +115,7 @@ export default function ShareButton({ cardId, label = "DATA MIRROR" }: ShareButt
       setIsCapturing(false);
     }
     // Twitterを開く（画像は手動で添付）
-    const text = encodeURIComponent("Data Mirror — 知らなかった自分を発見\n\nhttps://data-mirror-topaz.vercel.app");
+    const text = encodeURIComponent(`Data Mirror — 知らなかった自分を発見\n\n${window.location.origin}`);
     window.open(`https://twitter.com/intent/tweet?text=${text}`, "_blank");
   }, [captureCard, cardId]);
 

@@ -9,14 +9,15 @@ export default function NavDots() {
   const containerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    const cards = document.querySelectorAll(".card");
+    // hero セクションを除いた card0〜card5 のみ監視
+    const cards = document.querySelectorAll<HTMLElement>('.card[id^="card"]');
     if (cards.length === 0) return;
 
     const observer = new IntersectionObserver(
       (entries) => {
         entries.forEach((entry) => {
           if (entry.isIntersecting) {
-            const idx = Array.from(cards).indexOf(entry.target as Element);
+            const idx = Array.from(cards).indexOf(entry.target as HTMLElement);
             if (idx !== -1) setActiveIndex(idx);
           }
         });
@@ -29,7 +30,7 @@ export default function NavDots() {
   }, []);
 
   const handleClick = (index: number) => {
-    const cards = document.querySelectorAll(".card");
+    const cards = document.querySelectorAll('.card[id^="card"]');
     cards[index]?.scrollIntoView({ behavior: "smooth" });
   };
 
