@@ -8,6 +8,59 @@ export interface ParseProgress {
 
 export type ProgressCallback = (progress: ParseProgress) => void;
 
+interface FitDay {
+  date: string;
+  steps: number;
+  calories: number;
+  distance: number;
+  activeMinutes: number;
+}
+
+interface PayEntry {
+  ts: string;
+  amount?: number;
+  description: string;
+}
+
+interface LocationEntry {
+  ts: string;
+}
+
+interface RawParsedData {
+  watchHistory: { time: string }[];
+  searchHistory: { time: string }[];
+  chromeHistory: any[];
+  searchActivity: any[];
+  fitDays: FitDay[];
+  payments: PayEntry[];
+  locations: LocationEntry[];
+}
+
+// ============================================================
+// メインエントリポイント
+// ============================================================
+
+export async function parseFiles(
+  files: File[],
+  onProgress?: ProgressCallback
+): Promise<ParsedUserData> {
+  const zipFile = files.find(f => f.name.toLowerCase().endsWith(".zip"));
+  if (zipFile) {
+    // ブラウザメモリ上限を考慮（4GB超はクラッシュする）
+    if (zipFile.size > 4 * 1024 * 1024 * 1024) {
+      throw new Error(
+        "ZIPファイルが大きすぎます（4GB超）。Takeoutで写真・動画を除外するか、個別ファイルをアップロードしてください。"
+      );
+    }
+    return parseTakeoutZip(zipFile, onProgress);
+  }
+  return parseIndividualFiles(files, onProgress);
+}
+
+// ============================================================
+// ZIPパーサー
+// ============================================================
+
 export async function parseTakeoutZip(
   file: File,
   onProgress?: ProgressCallback
@@ -129,17 +182,7 @@ export async function parseTakeoutZip(
   onProgress?.({ stage: "フィットネスデータを解析中...", percent: 45 });
 
   // ========== Google Fit（日別CSV） ==========
-  interface FitDay {
-    date: string;
-    steps: number;
-    calories: number;
-    distance: number;
-    activeMinutes: number;
-  }
-
   const fitDays: FitDay[] = [];
-
-  // Fit/日別のアクティビティ指標/ or Fit/Daily activity metrics/ 内のYYYY-MM-DD.csv
   const fitCsvFiles = findFiles("fit", ".csv").filter(f => {
     const name = f.name.split("/").pop() || "";
     return /^\d{4}-\d{2}-\d{2}\.csv$/.test(name);
@@ -149,116 +192,253 @@ export async function parseTakeoutZip(
     const name = csvFile.name.split("/").pop() || "";
     const date = name.replace(".csv", "");
     const csv = await csvFile.async("string");
-    const lines = csv.split("\n").slice(1); // ヘッダースキップ
-
-    let steps = 0, calories = 0, distance = 0, activeMinutes = 0;
-    let hasData = false;
-
-    for (const line of lines) {
-      if (!line.trim()) continue;
-      const cols = line.split(",");
-      // index: 2=運動分, 3=カロリー, 4=距離, 14=歩数
-      const s = parseFloat(cols[14]);
-      const c = parseFloat(cols[3]);
-      const d = parseFloat(cols[4]);
-      const a = parseFloat(cols[2]);
-
-      if (!isNaN(s)) { steps += s; hasData = true; }
-      if (!isNaN(c)) { calories += c; hasData = true; }
-      if (!isNaN(d)) { distance += d; hasData = true; }
-      if (!isNaN(a)) { activeMinutes += a; hasData = true; }
-    }
-
-    if (hasData) {
-      fitDays.push({
-        date,
-        steps,
-        calories: Math.round(calories),
-        distance: Math.round(distance),
-        activeMinutes: Math.round(activeMinutes),
-      });
-    }
+    const day = parseFitCsv(csv, date);
+    if (day) fitDays.push(day);
   }
 
   onProgress?.({ stage: "決済データを解析中...", percent: 55 });
 
   // ========== Google Pay（CSV） ==========
-  interface PayEntry {
-    ts: string;
-    amount?: number;
-    description: string;
-  }
-
   const payments: PayEntry[] = [];
-
   const payFile = findFile([
     "Google での取引",
     "Google transactions",
   ]);
   if (payFile) {
     const csv = await payFile.async("string");
-    const lines = csv.split("\n").slice(1);
-
-    for (const line of lines) {
-      if (!line.trim()) continue;
-      const cols = parseCsvLine(line);
-      if (cols.length < 7) continue;
-
-      const [dateStr, , description, , , status, amountStr] = cols;
-      if (status === "キャンセル" || status === "Cancelled") continue;
-
-      // 日本語日付: "2026年4月25日 6:00"
-      const jpMatch = dateStr.match(/(\d{4})年(\d{1,2})月(\d{1,2})日\s+(\d{1,2}):(\d{2})/);
-      let ts: string | null = null;
-      if (jpMatch) {
-        const [, y, m, d, h, min] = jpMatch;
-        ts = `${y}-${m.padStart(2, "0")}-${d.padStart(2, "0")}T${h.padStart(2, "0")}:${min.padStart(2, "0")}:00+09:00`;
-      } else {
-        // 英語日付フォールバック
-        try {
-          const date = new Date(dateStr);
-          if (!isNaN(date.getTime())) ts = date.toISOString();
-        } catch {}
-      }
-      if (!ts) continue;
-
-      const amtMatch = amountStr?.match(/(?:JPY|¥)\s*([\d,]+)/);
-      const amount = amtMatch ? parseInt(amtMatch[1].replace(/,/g, ""), 10) : undefined;
-
-      payments.push({ ts, amount, description });
-    }
+    payments.push(...parsePayCsv(csv));
   }
 
   onProgress?.({ stage: "位置情報を解析中...", percent: 62 });
 
   // ========== Location History ==========
-  interface LocationEntry { ts: string }
-
   const locations: LocationEntry[] = [];
-
-  const locationFile = findFile([
-    "Records.json",
-  ]);
+  const locationFile = findFile(["Records.json"]);
   if (locationFile) {
     const content = await locationFile.async("string");
-    const data = JSON.parse(content);
-    const records: any[] = data.locations || [];
-
-    // 大量データなので1時間ごとにサンプリング
-    let lastHour = "";
-    for (const loc of records) {
-      const ts = loc.timestamp || (loc.timestampMs ? new Date(parseInt(loc.timestampMs)).toISOString() : null);
-      if (!ts) continue;
-
-      const hour = ts.slice(0, 13);
-      if (hour === lastHour) continue;
-      lastHour = hour;
-
-      locations.push({ ts });
-    }
+    locations.push(...parseLocationJson(content));
   }
 
+  return aggregateData({
+    watchHistory,
+    searchHistory,
+    chromeHistory,
+    searchActivity,
+    fitDays,
+    payments,
+    locations,
+  }, onProgress);
+}
+
+// ============================================================
+// 個別ファイルパーサー
+// ============================================================
+
+const FILE_DETECT_PATTERNS: [RegExp, string][] = [
+  [/watch-history\.(html|json)|再生履歴\.(html|json)/i, "youtube-watch"],
+  [/search-history\.(html|json)|検索履歴\.(html|json)/i, "youtube-search"],
+  [/browserhistory\.json|ブラウザ(の)?履歴\.json/i, "chrome"],
+  [/myactivity\.json|マイアクティビティ\.json/i, "search-activity"],
+  [/^\d{4}-\d{2}-\d{2}\.csv$/i, "fitness"],
+  [/^records\.json$/i, "location"],
+];
+
+function detectFileType(filename: string): string | null {
+  const name = filename.split("/").pop() || filename;
+  for (const [pattern, type] of FILE_DETECT_PATTERNS) {
+    if (pattern.test(name)) return type;
+  }
+  if (name.toLowerCase().endsWith(".csv") && /取引|transaction/i.test(name)) return "payments";
+  return null;
+}
+
+async function parseIndividualFiles(
+  files: File[],
+  onProgress?: ProgressCallback
+): Promise<ParsedUserData> {
+  const raw: RawParsedData = {
+    watchHistory: [],
+    searchHistory: [],
+    chromeHistory: [],
+    searchActivity: [],
+    fitDays: [],
+    payments: [],
+    locations: [],
+  };
+
+  const total = files.length;
+  let processed = 0;
+
+  for (const file of files) {
+    const type = detectFileType(file.name);
+    if (!type) { processed++; continue; }
+
+    const pct = Math.round(5 + (processed / total) * 60);
+
+    switch (type) {
+      case "youtube-watch": {
+        onProgress?.({ stage: "YouTube視聴履歴を解析中...", percent: pct });
+        const content = await file.text();
+        if (file.name.toLowerCase().endsWith(".html")) {
+          raw.watchHistory = parseYouTubeWatchHtml(content);
+        } else {
+          const parsed = JSON.parse(content);
+          raw.watchHistory = Array.isArray(parsed)
+            ? parsed.filter((e: any) => e.time).map((e: any) => ({ time: e.time }))
+            : [];
+        }
+        break;
+      }
+      case "youtube-search": {
+        onProgress?.({ stage: "YouTube検索履歴を解析中...", percent: pct });
+        const content = await file.text();
+        if (file.name.toLowerCase().endsWith(".html")) {
+          raw.searchHistory = parseYouTubeSearchHtml(content);
+        } else {
+          const parsed = JSON.parse(content);
+          raw.searchHistory = Array.isArray(parsed)
+            ? parsed.filter((e: any) => e.time).map((e: any) => ({ time: e.time }))
+            : [];
+        }
+        break;
+      }
+      case "chrome": {
+        onProgress?.({ stage: "Chrome履歴を解析中...", percent: pct });
+        const content = await file.text();
+        const parsed = JSON.parse(content);
+        raw.chromeHistory = parsed.Browser_History || parsed["Browser History"] || (Array.isArray(parsed) ? parsed : []);
+        break;
+      }
+      case "search-activity": {
+        onProgress?.({ stage: "Google検索を解析中...", percent: pct });
+        const content = await file.text();
+        raw.searchActivity = JSON.parse(content);
+        break;
+      }
+      case "fitness": {
+        onProgress?.({ stage: "フィットネスデータを解析中...", percent: pct });
+        const name = file.name.split("/").pop() || "";
+        const date = name.replace(".csv", "");
+        const content = await file.text();
+        const day = parseFitCsv(content, date);
+        if (day) raw.fitDays.push(day);
+        break;
+      }
+      case "payments": {
+        onProgress?.({ stage: "決済データを解析中...", percent: pct });
+        const content = await file.text();
+        raw.payments.push(...parsePayCsv(content));
+        break;
+      }
+      case "location": {
+        onProgress?.({ stage: "位置情報を解析中...", percent: pct });
+        const content = await file.text();
+        raw.locations.push(...parseLocationJson(content));
+        break;
+      }
+    }
+    processed++;
+  }
+
+  return aggregateData(raw, onProgress);
+}
+
+// ============================================================
+// 個別データ型パーサー（ZIP・個別ファイル共通）
+// ============================================================
+
+function parseFitCsv(csv: string, date: string): FitDay | null {
+  const lines = csv.split("\n").slice(1);
+  let steps = 0, calories = 0, distance = 0, activeMinutes = 0;
+  let hasData = false;
+
+  for (const line of lines) {
+    if (!line.trim()) continue;
+    const cols = line.split(",");
+    const s = parseFloat(cols[14]);
+    const c = parseFloat(cols[3]);
+    const d = parseFloat(cols[4]);
+    const a = parseFloat(cols[2]);
+
+    if (!isNaN(s)) { steps += s; hasData = true; }
+    if (!isNaN(c)) { calories += c; hasData = true; }
+    if (!isNaN(d)) { distance += d; hasData = true; }
+    if (!isNaN(a)) { activeMinutes += a; hasData = true; }
+  }
+
+  if (!hasData) return null;
+  return {
+    date,
+    steps,
+    calories: Math.round(calories),
+    distance: Math.round(distance),
+    activeMinutes: Math.round(activeMinutes),
+  };
+}
+
+function parsePayCsv(csv: string): PayEntry[] {
+  const payments: PayEntry[] = [];
+  const lines = csv.split("\n").slice(1);
+
+  for (const line of lines) {
+    if (!line.trim()) continue;
+    const cols = parseCsvLine(line);
+    if (cols.length < 7) continue;
+
+    const [dateStr, , description, , , status, amountStr] = cols;
+    if (status === "キャンセル" || status === "Cancelled") continue;
+
+    const jpMatch = dateStr.match(/(\d{4})年(\d{1,2})月(\d{1,2})日\s+(\d{1,2}):(\d{2})/);
+    let ts: string | null = null;
+    if (jpMatch) {
+      const [, y, m, d, h, min] = jpMatch;
+      ts = `${y}-${m.padStart(2, "0")}-${d.padStart(2, "0")}T${h.padStart(2, "0")}:${min.padStart(2, "0")}:00+09:00`;
+    } else {
+      try {
+        const date = new Date(dateStr);
+        if (!isNaN(date.getTime())) ts = date.toISOString();
+      } catch { /* 日付パース失敗は無視 */ }
+    }
+    if (!ts) continue;
+
+    const amtMatch = amountStr?.match(/(?:JPY|¥)\s*([\d,]+)/);
+    const amount = amtMatch ? parseInt(amtMatch[1].replace(/,/g, ""), 10) : undefined;
+
+    payments.push({ ts, amount, description });
+  }
+
+  return payments;
+}
+
+function parseLocationJson(content: string): LocationEntry[] {
+  const locations: LocationEntry[] = [];
+  const data = JSON.parse(content);
+  const records: any[] = data.locations || [];
+
+  // 大量データなので1時間ごとにサンプリング
+  let lastHour = "";
+  for (const loc of records) {
+    const ts = loc.timestamp || (loc.timestampMs ? new Date(parseInt(loc.timestampMs)).toISOString() : null);
+    if (!ts) continue;
+
+    const hour = ts.slice(0, 13);
+    if (hour === lastHour) continue;
+    lastHour = hour;
+
+    locations.push({ ts });
+  }
+
+  return locations;
+}
+
+// ============================================================
+// データ集計（共通ロジック）
+// ============================================================
+
+function aggregateData(raw: RawParsedData, onProgress?: ProgressCallback): ParsedUserData {
   onProgress?.({ stage: "データを集計中...", percent: 70 });
+
+  const { watchHistory, searchHistory, chromeHistory, searchActivity, fitDays, payments, locations } = raw;
 
   // ========== ヒートマップ構築 (7x24) ==========
   const heatmap: number[][] = Array.from({ length: 7 }, () => new Array(24).fill(0));
@@ -291,8 +471,8 @@ export async function parseTakeoutZip(
   const peakHour = hourTotals.indexOf(Math.max(...hourTotals));
 
   // 夜行性指数
-  const nightActivity = hourTotals.slice(0, 6).reduce((a, b) => a + b, 0);
-  const totalActivity = hourTotals.reduce((a, b) => a + b, 0);
+  const nightActivity = hourTotals.slice(0, 6).reduce((a: number, b: number) => a + b, 0);
+  const totalActivity = hourTotals.reduce((a: number, b: number) => a + b, 0);
   const nocturnalIndex = totalActivity > 0 ? Math.round((nightActivity / totalActivity) * 100) : 0;
 
   // YouTubeアルゴリズム率
@@ -342,22 +522,22 @@ export async function parseTakeoutZip(
 
   // 全16パターンのタイプ名
   const typeNames: Record<string, string> = {
-    "O-N-B-H": "THE ARCHITECT",     // 雑食・夜型・構築・自律
-    "O-D-B-H": "THE ENGINEER",      // 雑食・昼型・構築・自律
-    "O-N-E-H": "THE EXPLORER",      // 雑食・夜型・体験・自律
-    "O-D-E-H": "THE ANALYST",       // 雑食・昼型・体験・自律
-    "S-N-B-H": "THE SPECIALIST",    // 専門・夜型・構築・自律
-    "S-D-B-H": "THE CRAFTSMAN",     // 専門・昼型・構築・自律
-    "S-N-E-H": "THE DEEP DIVER",    // 専門・夜型・体験・自律
-    "S-D-E-H": "THE CURATOR",       // 専門・昼型・体験・自律
-    "O-N-B-A": "THE AUTOMATOR",     // 雑食・夜型・構築・受動
-    "O-D-B-A": "THE OPTIMIZER",     // 雑食・昼型・構築・受動
-    "O-N-E-A": "THE DRIFTER",       // 雑食・夜型・体験・受動
-    "O-D-E-A": "THE ABSORBER",      // 雑食・昼型・体験・受動
-    "S-N-B-A": "THE OPERATOR",      // 専門・夜型・構築・受動
-    "S-D-B-A": "THE MECHANIC",      // 専門・昼型・構築・受動
-    "S-N-E-A": "THE CONSUMER",      // 専門・夜型・体験・受動
-    "S-D-E-A": "THE PASSENGER",     // 専門・昼型・体験・受動
+    "O-N-B-H": "THE ARCHITECT",
+    "O-D-B-H": "THE ENGINEER",
+    "O-N-E-H": "THE EXPLORER",
+    "O-D-E-H": "THE ANALYST",
+    "S-N-B-H": "THE SPECIALIST",
+    "S-D-B-H": "THE CRAFTSMAN",
+    "S-N-E-H": "THE DEEP DIVER",
+    "S-D-E-H": "THE CURATOR",
+    "O-N-B-A": "THE AUTOMATOR",
+    "O-D-B-A": "THE OPTIMIZER",
+    "O-N-E-A": "THE DRIFTER",
+    "O-D-E-A": "THE ABSORBER",
+    "S-N-B-A": "THE OPERATOR",
+    "S-D-B-A": "THE MECHANIC",
+    "S-N-E-A": "THE CONSUMER",
+    "S-D-E-A": "THE PASSENGER",
   };
   const typeName = typeNames[typeCode] || "THE DIGITAL NATIVE";
 
@@ -365,7 +545,6 @@ export async function parseTakeoutZip(
 
   // ========== データ価値の推定 ==========
   const dataMultiplier = Math.max(0.5, Math.min(3.0, totalDataPoints / 50000));
-  // 位置情報・決済データがあると企業にとっての価値が上がる
   const locationBonus = locations.length > 0 ? 1.2 : 1.0;
   const paymentBonus = payments.length > 0 ? 1.15 : 1.0;
   const googleValue = Math.round(8500 * dataMultiplier * locationBonus);
@@ -449,7 +628,7 @@ export async function parseTakeoutZip(
       algorithmPercent: ytAlgorithmPercent,
     },
     subscriptions: {
-      totalAnnual: 0, // Takeoutからは判定不可
+      totalAnnual: 0,
       count: 0,
       services: [],
     },
@@ -526,11 +705,6 @@ export async function parseTakeoutZip(
 
 /**
  * YouTube視聴履歴をHTMLからパース
- *
- * 形式:
- * <a href="VIDEO_URL">TITLE</a> を視聴しました<br>
- * <a href="CHANNEL_URL">CHANNEL_NAME</a><br>
- * YYYY/MM/DD H:MM:SS JST<br>
  */
 function parseYouTubeWatchHtml(html: string): { time: string }[] {
   const entries: { time: string }[] = [];
@@ -549,7 +723,7 @@ function parseYouTubeWatchHtml(html: string): { time: string }[] {
     });
   }
 
-  // 英語Takeoutフォールバック: content-cell内のyoutube watch URLと日付を個別に取得
+  // 英語Takeoutフォールバック
   if (entries.length === 0) {
     const cellRegex = /<div class="content-cell[^"]*mdl-typography--body-1"[^>]*>([\s\S]*?)<\/div>/g;
     let cellMatch;
@@ -557,7 +731,6 @@ function parseYouTubeWatchHtml(html: string): { time: string }[] {
       const cell = cellMatch[1];
       if (!cell.includes("youtube.com/watch?v=")) continue;
 
-      // 英語日付: "Jan 15, 2026, 3:45:20 PM UTC" or "Jan 15, 2026, 15:45:20 UTC"
       const dateMatch = cell.match(/(\w{3}\s+\d{1,2},\s+\d{4},?\s+\d{1,2}:\d{2}:\d{2}\s*(?:AM|PM)?\s*\w+)/);
       if (dateMatch) {
         try {
@@ -573,15 +746,10 @@ function parseYouTubeWatchHtml(html: string): { time: string }[] {
 
 /**
  * YouTube検索履歴をHTMLからパース
- *
- * 形式:
- * <a href="SEARCH_URL">QUERY</a> を検索しました<br>
- * YYYY/MM/DD H:MM:SS JST<br>
  */
 function parseYouTubeSearchHtml(html: string): { time: string }[] {
   const entries: { time: string }[] = [];
 
-  // 日本語Takeout
   const jpRegex = /<a href="https:\/\/www\.youtube\.com\/results\?search_query=[^"]+">(?:[^<]+)<\/a>\s*(?:」\s*)?を検索しました\s*<br>\s*(\d{4}\/\d{2}\/\d{2}\s+\d{1,2}:\d{2}:\d{2})\s*JST/g;
 
   let match;
@@ -595,7 +763,6 @@ function parseYouTubeSearchHtml(html: string): { time: string }[] {
     });
   }
 
-  // 英語フォールバック
   if (entries.length === 0) {
     const cellRegex = /<div class="content-cell[^"]*mdl-typography--body-1"[^>]*>([\s\S]*?)<\/div>/g;
     let cellMatch;

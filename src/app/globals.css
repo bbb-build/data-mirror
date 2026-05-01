@@ -39,8 +39,7 @@ body {
 }
 
 /* ===== Card base ===== */
-.card,
-.card-static {
+.card {
   width: 100vw;
   height: 100vh;
   min-height: 100dvh;
@@ -51,10 +50,18 @@ body {
   overflow: hidden;
   padding: 40px 20px;
   z-index: 1;
+  scroll-snap-align: start;
 }
 
-.card {
-  scroll-snap-align: start;
+.card-static {
+  width: 100vw;
+  min-height: 100dvh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  padding: 60px 20px;
+  z-index: 1;
 }
 
 .card .card-inner {
@@ -373,9 +380,12 @@ body {
 
 /* ===== Mobile Responsive ===== */
 @media (max-width: 480px) {
-  .card,
-  .card-static {
+  .card {
     padding: 24px 12px;
+  }
+
+  .card-static {
+    padding: 40px 12px;
   }
 
   .card-inner {

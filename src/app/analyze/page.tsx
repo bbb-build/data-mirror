@@ -3,7 +3,7 @@
 import { useState } from "react";
 import dynamic from "next/dynamic";
 import { ParsedUserData } from "@/lib/types";
-import { parseTakeoutZip, ParseProgress } from "@/lib/parsers/takeout-parser";
+import { parseFiles, ParseProgress } from "@/lib/parsers/takeout-parser";
 import { SAMPLE_DATA } from "@/lib/sample-data";
 
 const ScrollReveal = dynamic(() => import("@/components/ui/ScrollReveal"), { ssr: false });
@@ -24,7 +24,7 @@ function TakeoutGuide() {
     { label: "1", text: "takeout.google.com を開く", sub: "Googleアカウントでログイン" },
     { label: "2", text: "「選択をすべて解除」をクリック", sub: "一度全てのチェックを外す" },
     { label: "3", text: "以下を選択してチェック", sub: null, items: [
-      { name: "YouTube と YouTube Music", note: "必須 — 視聴・検索履歴" },
+      { name: "YouTube と YouTube Music", note: "推奨 — 視聴・検索履歴" },
       { name: "Chrome", note: "推奨 — ブラウザ閲覧履歴" },
       { name: "マイ アクティビティ", note: "推奨 — Google検索履歴" },
       { name: "Fit", note: "任意 — フィットネスデータ" },
@@ -33,6 +33,7 @@ function TakeoutGuide() {
     ]},
     { label: "4", text: "「次のステップ」→「エクスポートを作成」", sub: "ZIPファイルの準備が始まる" },
     { label: "5", text: "メールでダウンロードリンクが届く", sub: "データ量により数分〜数時間" },
+    { label: "💡", text: "ZIPが大きすぎる場合", sub: "解凍して個別ファイル（HTML/JSON/CSV）を直接アップロードできます" },
   ];
 
   return (
@@ -142,11 +143,11 @@ export default function AnalyzePage() {
   const [progress, setProgress] = useState<ParseProgress>({ stage: "", percent: 0 });
   const [error, setError] = useState<string | null>(null);
 
-  const handleFileSelected = async (file: File) => {
+  const handleFilesReady = async (files: File[]) => {
     setIsProcessing(true);
     setError(null);
     try {
-      const result = await parseTakeoutZip(file, (p) => setProgress(p));
+      const result = await parseFiles(files, (p) => setProgress(p));
       setData(result);
     } catch (err) {
       setError(err instanceof Error ? err.message : "解析に失敗しました");
@@ -176,11 +177,11 @@ export default function AnalyzePage() {
               あなたのデジタルDNAを解析
             </div>
             <div className="card-sub" style={{ marginBottom: 8 }}>
-              Google Takeoutのデータをアップロードして<br />
-              知らなかった自分を発見しよう
+              好きなデータを好きなだけアップロード<br />
+              あるものだけで、あなたを解析します
             </div>
             <FileUpload
-              onFileSelected={handleFileSelected}
+              onFilesReady={handleFilesReady}
               isProcessing={isProcessing}
               progress={progress}
             />
