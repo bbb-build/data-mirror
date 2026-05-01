@@ -39,11 +39,11 @@ body {
 }
 
 /* ===== Card base ===== */
-.card {
+.card,
+.card-static {
   width: 100vw;
   height: 100vh;
   min-height: 100dvh;
-  scroll-snap-align: start;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -51,6 +51,10 @@ body {
   overflow: hidden;
   padding: 40px 20px;
   z-index: 1;
+}
+
+.card {
+  scroll-snap-align: start;
 }
 
 .card .card-inner {
@@ -369,7 +373,8 @@ body {
 
 /* ===== Mobile Responsive ===== */
 @media (max-width: 480px) {
-  .card {
+  .card,
+  .card-static {
     padding: 24px 12px;
   }
 

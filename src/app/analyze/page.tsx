@@ -160,7 +160,7 @@ export default function AnalyzePage() {
     return (
       <>
         <BackgroundParticles />
-        <section className="card">
+        <section className="card-static">
           <div className="scanline" />
           <div className="card-inner" style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 24 }}>
             <div style={{
