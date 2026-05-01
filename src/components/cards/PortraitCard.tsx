@@ -168,7 +168,7 @@ export default function PortraitCard({ categories, heatmap, totalDataPoints }: P
   }, [categories, heatmap, totalDataPoints]);
 
   return (
-    <section className="card" id="card4" style={{ padding: 0, overflow: "hidden" }}>
+    <section className="card" id="card4" style={{ padding: 0, overflow: "hidden", height: "100dvh" }}>
       <div className="card-inner" style={{ position: "relative", width: "100%", height: "100%" }}>
         <div ref={frameRef} style={{ position: "absolute", inset: 0, width: "100%", height: "100%" }}>
           <canvas ref={canvasRef} style={{ width: "100%", height: "100%", display: "block" }} />

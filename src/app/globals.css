@@ -26,7 +26,7 @@
 }
 
 html {
-  scroll-snap-type: y mandatory;
+  scroll-snap-type: y proximity;
   scroll-behavior: smooth;
 }
 
@@ -41,13 +41,11 @@ body {
 /* ===== Card base ===== */
 .card {
   width: 100vw;
-  height: 100vh;
   min-height: 100dvh;
   display: flex;
   align-items: center;
   justify-content: center;
   position: relative;
-  overflow: hidden;
   padding: 40px 20px;
   z-index: 1;
   scroll-snap-align: start;
