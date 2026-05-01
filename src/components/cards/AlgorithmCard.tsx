@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef } from "react";
+import ShareButton from "@/components/ui/ShareButton";
 
 interface AlgorithmCardProps {
   algorithmRate: number;
@@ -229,6 +230,7 @@ export default function AlgorithmCard({ algorithmRate, youtube, subscriptions }:
           私のアルゴリズム支配率: {algorithmRate}% #DataMirror
         </div>
       </div>
+      <ShareButton cardId="card2" label="アルゴリズム支配率" />
     </section>
   );
 }

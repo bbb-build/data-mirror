@@ -4,7 +4,9 @@ import { useState } from "react";
 import dynamic from "next/dynamic";
 import { ParsedUserData } from "@/lib/types";
 import { parseTakeoutZip, ParseProgress } from "@/lib/parsers/takeout-parser";
+import { SAMPLE_DATA } from "@/lib/sample-data";
 
+const ScrollReveal = dynamic(() => import("@/components/ui/ScrollReveal"), { ssr: false });
 const FileUpload = dynamic(() => import("@/components/ui/FileUpload"), { ssr: false });
 const BackgroundParticles = dynamic(() => import("@/components/ui/BackgroundParticles"), { ssr: false });
 const NavDots = dynamic(() => import("@/components/ui/NavDots"), { ssr: false });
@@ -94,6 +96,31 @@ export default function AnalyzePage() {
               からデータをエクスポートしてください。
               YouTube履歴とChrome履歴を含めると最も精度の高い分析が得られます。
             </div>
+            <button
+              onClick={() => setData(SAMPLE_DATA)}
+              style={{
+                background: "none",
+                border: "1px solid rgba(0,229,255,0.2)",
+                borderRadius: 20,
+                padding: "8px 20px",
+                color: "var(--text3)",
+                fontSize: 12,
+                fontFamily: "'JetBrains Mono', monospace",
+                cursor: "pointer",
+                transition: "all 0.3s",
+                letterSpacing: 1,
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.borderColor = "rgba(0,229,255,0.5)";
+                e.currentTarget.style.color = "var(--cyan)";
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.borderColor = "rgba(0,229,255,0.2)";
+                e.currentTarget.style.color = "var(--text3)";
+              }}
+            >
+              デモで試す →
+            </button>
           </div>
         </section>
       </>
@@ -103,6 +130,7 @@ export default function AnalyzePage() {
   // Show results
   return (
     <>
+      <ScrollReveal />
       <BackgroundParticles />
       <NavDots />
       <IntroCard totalDataPoints={data.totalDataPoints} sourceCount={data.sources.length} />

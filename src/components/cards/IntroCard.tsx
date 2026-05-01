@@ -2,6 +2,7 @@
 
 import { useEffect, useRef } from "react";
 import * as THREE from "three";
+import ShareButton from "@/components/ui/ShareButton";
 
 interface IntroCardProps {
   totalDataPoints: number;
@@ -18,7 +19,7 @@ export default function IntroCard({ totalDataPoints, sourceCount }: IntroCardPro
     const scene = new THREE.Scene();
     const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 1000);
     camera.position.z = 30;
-    const renderer = new THREE.WebGLRenderer({ canvas, alpha: true, antialias: true });
+    const renderer = new THREE.WebGLRenderer({ canvas, alpha: true, antialias: true, preserveDrawingBuffer: true });
     renderer.setSize(window.innerWidth, window.innerHeight);
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
 
@@ -181,6 +182,7 @@ export default function IntroCard({ totalDataPoints, sourceCount }: IntroCardPro
           WORLD ID VERIFIED
         </div>
       </div>
+      <ShareButton cardId="card0" label="デジタルDNA" />
       <div className="scroll-hint">
         <span>スクロールして探索</span>
         <div className="scroll-arrow" />

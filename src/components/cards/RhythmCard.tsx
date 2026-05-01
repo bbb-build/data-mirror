@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef } from "react";
+import ShareButton from "@/components/ui/ShareButton";
 
 interface RhythmCardProps {
   heatmap: number[][];
@@ -166,6 +167,7 @@ export default function RhythmCard({ heatmap, peakHour, nocturnalIndex }: Rhythm
           </div>
         </div>
       </div>
+      <ShareButton cardId="card1" label="生活リズムDNA" />
     </section>
   );
 }

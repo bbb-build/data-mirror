@@ -1,5 +1,7 @@
 "use client";
 
+import ShareButton from "@/components/ui/ShareButton";
+
 interface DataTypeAxis {
   label: [string, string];
   value: number;
@@ -107,6 +109,7 @@ export default function DataTypeCard({ code, name, axes }: DataTypeCardProps) {
           私のデータ型: {code} ({name}) #DataMirror
         </div>
       </div>
+      <ShareButton cardId="card3" label="データ型" />
     </section>
   );
 }

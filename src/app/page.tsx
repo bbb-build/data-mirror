@@ -4,6 +4,7 @@ import dynamic from "next/dynamic";
 import Link from "next/link";
 import { SAMPLE_DATA } from "@/lib/sample-data";
 
+const ScrollReveal = dynamic(() => import("@/components/ui/ScrollReveal"), { ssr: false });
 const BackgroundParticles = dynamic(() => import("@/components/ui/BackgroundParticles"), { ssr: false });
 const NavDots = dynamic(() => import("@/components/ui/NavDots"), { ssr: false });
 const IntroCard = dynamic(() => import("@/components/cards/IntroCard"), { ssr: false });
@@ -18,6 +19,7 @@ export default function Home() {
 
   return (
     <>
+      <ScrollReveal />
       <BackgroundParticles />
 
       {/* Hero LP Section */}

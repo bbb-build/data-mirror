@@ -1,5 +1,4 @@
 @import url("https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;700&family=Inter:wght@300;400;500;600;700;800;900&display=swap");
-@import "tailwindcss";
 
 :root {
   --bg: #030711;
@@ -52,6 +51,17 @@ body {
   overflow: hidden;
   padding: 40px 20px;
   z-index: 1;
+}
+
+.card .card-inner {
+  opacity: 0;
+  transform: translateY(30px);
+  transition: opacity 0.8s cubic-bezier(0.4, 0, 0.2, 1), transform 0.8s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.card.visible .card-inner {
+  opacity: 1;
+  transform: translateY(0);
 }
 
 .card-inner {
@@ -251,4 +261,162 @@ body {
   background-size: 40px 40px;
   pointer-events: none;
   z-index: 0;
+}
+
+/* ===== Share Button ===== */
+.share-container {
+  position: absolute;
+  bottom: 20px;
+  right: 20px;
+  z-index: 50;
+}
+
+.share-btn {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: rgba(0, 229, 255, 0.1);
+  border: 1px solid rgba(0, 229, 255, 0.25);
+  color: var(--cyan);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+}
+
+.share-btn:hover {
+  background: rgba(0, 229, 255, 0.2);
+  border-color: rgba(0, 229, 255, 0.5);
+  box-shadow: 0 0 20px rgba(0, 229, 255, 0.2);
+  transform: scale(1.1);
+}
+
+.share-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.share-spinner {
+  width: 16px;
+  height: 16px;
+  border: 2px solid rgba(0, 229, 255, 0.3);
+  border-top: 2px solid var(--cyan);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.share-menu {
+  position: absolute;
+  bottom: 48px;
+  right: 0;
+  background: rgba(8, 14, 30, 0.95);
+  border: 1px solid rgba(0, 229, 255, 0.15);
+  border-radius: 12px;
+  padding: 6px;
+  min-width: 150px;
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  animation: fadeIn 0.15s ease-out;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.share-menu-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 10px 14px;
+  background: none;
+  border: none;
+  color: var(--text2);
+  font-size: 13px;
+  font-family: "Inter", sans-serif;
+  cursor: pointer;
+  border-radius: 8px;
+  transition: all 0.2s;
+  white-space: nowrap;
+}
+
+.share-menu-item:hover {
+  background: rgba(0, 229, 255, 0.08);
+  color: var(--cyan);
+}
+
+/* ===== Mobile Responsive ===== */
+@media (max-width: 480px) {
+  .card {
+    padding: 24px 12px;
+  }
+
+  .card-inner {
+    max-width: 100%;
+  }
+
+  .card-title {
+    font-size: 24px;
+  }
+
+  .card-sub {
+    font-size: 12px;
+    margin-bottom: 20px;
+  }
+
+  .seq-label {
+    font-size: 9px;
+    letter-spacing: 3px;
+  }
+
+  .nav-dots {
+    right: 8px;
+    gap: 8px;
+  }
+
+  .nav-dot {
+    width: 5px;
+    height: 5px;
+  }
+
+  .nav-dot.active {
+    width: 5px;
+    height: 16px;
+  }
+
+  .share-container {
+    bottom: 14px;
+    right: 14px;
+  }
+
+  .share-btn {
+    width: 36px;
+    height: 36px;
+  }
+}
+
+@media (max-width: 360px) {
+  .card-title {
+    font-size: 20px;
+  }
+
+  .card-sub {
+    font-size: 11px;
+  }
 }

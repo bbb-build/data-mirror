@@ -2,6 +2,7 @@
 
 import { useEffect, useRef } from "react";
 import * as THREE from "three";
+import ShareButton from "@/components/ui/ShareButton";
 
 interface Category {
   weight: number;
@@ -30,7 +31,7 @@ export default function PortraitCard({ categories, heatmap, totalDataPoints }: P
     const scene = new THREE.Scene();
     const camera = new THREE.PerspectiveCamera(50, w / h, 0.1, 100);
     camera.position.z = 22;
-    const renderer = new THREE.WebGLRenderer({ canvas, alpha: true, antialias: true });
+    const renderer = new THREE.WebGLRenderer({ canvas, alpha: true, antialias: true, preserveDrawingBuffer: true });
     renderer.setSize(w, h, false);
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
 
@@ -191,6 +192,7 @@ export default function PortraitCard({ categories, heatmap, totalDataPoints }: P
           </div>
         </div>
       </div>
+      <ShareButton cardId="card4" label="データ肖像画" />
     </section>
   );
 }

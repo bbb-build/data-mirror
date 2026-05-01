@@ -1,5 +1,7 @@
 "use client";
 
+import ShareButton from "@/components/ui/ShareButton";
+
 interface Company {
   name: string;
   logo: string;
@@ -95,6 +97,7 @@ export default function DataValueCard({ companies, totalAnnual, humadReturn }: D
           現在、100%が企業へ。あなたには0%。
         </div>
       </div>
+      <ShareButton cardId="card5" label="データの価値" />
     </section>
   );
 }
