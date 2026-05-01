@@ -7,9 +7,10 @@ import ShareButton from "@/components/ui/ShareButton";
 interface IntroCardProps {
   totalDataPoints: number;
   sourceCount: number;
+  sources?: string[];
 }
 
-export default function IntroCard({ totalDataPoints, sourceCount }: IntroCardProps) {
+export default function IntroCard({ totalDataPoints, sourceCount, sources }: IntroCardProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
   useEffect(() => {
@@ -177,6 +178,31 @@ export default function IntroCard({ totalDataPoints, sourceCount }: IntroCardPro
             </div>
           </div>
         </div>
+        {sources && sources.length > 0 && sources[0] !== "データなし" && (
+          <div style={{
+            display: "flex",
+            flexWrap: "wrap",
+            gap: 6,
+            justifyContent: "center",
+            marginTop: 16,
+            maxWidth: 320,
+          }}>
+            {sources.map((source) => (
+              <span key={source} style={{
+                fontFamily: "'JetBrains Mono', monospace",
+                fontSize: 9,
+                letterSpacing: 1,
+                padding: "4px 10px",
+                borderRadius: 12,
+                border: "1px solid rgba(0,229,255,0.2)",
+                color: "var(--cyan)",
+                background: "rgba(0,229,255,0.04)",
+              }}>
+                {source}
+              </span>
+            ))}
+          </div>
+        )}
         <div className="badge badge-green" style={{ marginTop: 20 }}>
           <span className="badge-dot green" />
           WORLD ID VERIFIED

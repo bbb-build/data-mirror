@@ -140,6 +140,18 @@ export default function AlgorithmCard({ algorithmRate, youtube, subscriptions }:
     ? ((youtube.searchCount / youtube.totalViews) * 100).toFixed(1)
     : "0.0";
 
+  const hasSubscriptions = subscriptions.count > 0;
+
+  // YouTube視聴パターンの解釈
+  const algorithmVerdict = algorithmRate >= 70
+    ? "あなたのコンテンツ体験はほぼアルゴリズムが設計している"
+    : algorithmRate >= 40
+      ? "自分の意志とアルゴリズムが混在している"
+      : "あなたは自分で選んでいる側の人間だ";
+
+  // おすすめ経由の視聴数（検索以外）
+  const recommendedViews = Math.max(0, youtube.totalViews - youtube.searchCount);
+
   return (
     <section className="card" id="card2">
       <div className="grid-overlay" />
@@ -168,7 +180,7 @@ export default function AlgorithmCard({ algorithmRate, youtube, subscriptions }:
           </div>
         </div>
         <div style={{ fontSize: 14, fontWeight: 600, color: "var(--text)", marginBottom: 20, lineHeight: 1.5 }}>
-          あなたのデジタルライフの{algorithmRate}%は<br />アルゴリズムが決めている
+          {algorithmVerdict}
         </div>
         <div style={{ display: "flex", flexDirection: "column", gap: 8, textAlign: "left", marginBottom: 16 }}>
           <div style={{
@@ -178,7 +190,7 @@ export default function AlgorithmCard({ algorithmRate, youtube, subscriptions }:
             background: "rgba(255,255,255,0.02)",
             fontSize: 12, color: "var(--text2)", lineHeight: 1.5,
           }}>
-            <span style={{ fontSize: 16, flexShrink: 0, lineHeight: 1.3 }}>🎬</span>
+            <span style={{ fontSize: 16, flexShrink: 0, lineHeight: 1.3 }}>&#x1F3AC;</span>
             <div>
               YouTube: <strong style={{ color: "var(--amber)" }}>{youtube.algorithmPercent}%</strong>がアルゴリズム選択
               <br />
@@ -187,36 +199,81 @@ export default function AlgorithmCard({ algorithmRate, youtube, subscriptions }:
               </span>
             </div>
           </div>
-          <div style={{
-            display: "flex", alignItems: "flex-start", gap: 10,
-            padding: "10px 14px", borderRadius: 10,
-            border: "1px solid rgba(255,255,255,0.06)",
-            background: "rgba(255,255,255,0.02)",
-            fontSize: 12, color: "var(--text2)", lineHeight: 1.5,
-          }}>
-            <span style={{ fontSize: 16, flexShrink: 0, lineHeight: 1.3 }}>💳</span>
-            <div>
-              年間<strong style={{ color: "var(--amber)" }}>¥{subscriptions.totalAnnual.toLocaleString()}</strong>が判断なしに自動更新
-              <br />
-              <span style={{ fontSize: 10, color: "var(--text3)" }}>
-                {subscriptions.services.join(", ")}...
-              </span>
-            </div>
-          </div>
-          <div style={{
-            display: "flex", alignItems: "flex-start", gap: 10,
-            padding: "10px 14px", borderRadius: 10,
-            border: "1px solid rgba(255,255,255,0.06)",
-            background: "rgba(255,255,255,0.02)",
-            fontSize: 12, color: "var(--text2)", lineHeight: 1.5,
-          }}>
-            <span style={{ fontSize: 16, flexShrink: 0, lineHeight: 1.3 }}>🔄</span>
-            <div>
-              <strong style={{ color: "var(--amber)" }}>{subscriptions.count}サービス</strong>が月額自動課金
-              <br />
-              <span style={{ fontSize: 10, color: "var(--text3)" }}>毎月の判断機会: 0</span>
-            </div>
-          </div>
+          {hasSubscriptions ? (
+            <>
+              <div style={{
+                display: "flex", alignItems: "flex-start", gap: 10,
+                padding: "10px 14px", borderRadius: 10,
+                border: "1px solid rgba(255,255,255,0.06)",
+                background: "rgba(255,255,255,0.02)",
+                fontSize: 12, color: "var(--text2)", lineHeight: 1.5,
+              }}>
+                <span style={{ fontSize: 16, flexShrink: 0, lineHeight: 1.3 }}>&#x1F4B3;</span>
+                <div>
+                  年間<strong style={{ color: "var(--amber)" }}>&yen;{subscriptions.totalAnnual.toLocaleString()}</strong>が判断なしに自動更新
+                  <br />
+                  <span style={{ fontSize: 10, color: "var(--text3)" }}>
+                    {subscriptions.services.join(", ")}...
+                  </span>
+                </div>
+              </div>
+              <div style={{
+                display: "flex", alignItems: "flex-start", gap: 10,
+                padding: "10px 14px", borderRadius: 10,
+                border: "1px solid rgba(255,255,255,0.06)",
+                background: "rgba(255,255,255,0.02)",
+                fontSize: 12, color: "var(--text2)", lineHeight: 1.5,
+              }}>
+                <span style={{ fontSize: 16, flexShrink: 0, lineHeight: 1.3 }}>&#x1F504;</span>
+                <div>
+                  <strong style={{ color: "var(--amber)" }}>{subscriptions.count}サービス</strong>が月額自動課金
+                  <br />
+                  <span style={{ fontSize: 10, color: "var(--text3)" }}>毎月の判断機会: 0</span>
+                </div>
+              </div>
+            </>
+          ) : (
+            <>
+              <div style={{
+                display: "flex", alignItems: "flex-start", gap: 10,
+                padding: "10px 14px", borderRadius: 10,
+                border: "1px solid rgba(255,255,255,0.06)",
+                background: "rgba(255,255,255,0.02)",
+                fontSize: 12, color: "var(--text2)", lineHeight: 1.5,
+              }}>
+                <span style={{ fontSize: 16, flexShrink: 0, lineHeight: 1.3 }}>&#x1F4CA;</span>
+                <div>
+                  おすすめ経由で<strong style={{ color: "var(--amber)" }}>{recommendedViews.toLocaleString()}本</strong>を視聴
+                  <br />
+                  <span style={{ fontSize: 10, color: "var(--text3)" }}>
+                    自分で検索して見つけたのは{youtube.searchCount.toLocaleString()}本だけ
+                  </span>
+                </div>
+              </div>
+              <div style={{
+                display: "flex", alignItems: "flex-start", gap: 10,
+                padding: "10px 14px", borderRadius: 10,
+                border: "1px solid rgba(255,255,255,0.06)",
+                background: "rgba(255,255,255,0.02)",
+                fontSize: 12, color: "var(--text2)", lineHeight: 1.5,
+              }}>
+                <span style={{ fontSize: 16, flexShrink: 0, lineHeight: 1.3 }}>&#x1F9ED;</span>
+                <div>
+                  コンテンツ発見パターン: <strong style={{ color: "var(--amber)" }}>
+                    {algorithmRate >= 70 ? "受動探索型" : algorithmRate >= 40 ? "ハイブリッド型" : "能動探索型"}
+                  </strong>
+                  <br />
+                  <span style={{ fontSize: 10, color: "var(--text3)" }}>
+                    {algorithmRate >= 70
+                      ? "フィードに流れてくるものを消費する傾向"
+                      : algorithmRate >= 40
+                        ? "検索とおすすめを使い分けている"
+                        : "自分で探して見つけるスタイル"}
+                  </span>
+                </div>
+              </div>
+            </>
+          )}
         </div>
         <div style={{
           fontFamily: "'JetBrains Mono', monospace",
