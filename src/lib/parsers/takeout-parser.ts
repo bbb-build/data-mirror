@@ -114,11 +114,13 @@ export async function parseTakeoutZip(
       "再生履歴.json",
     ]);
     if (watchJsonFile) {
-      const content = await watchJsonFile.async("string");
-      const parsed = JSON.parse(content);
-      watchHistory = Array.isArray(parsed)
-        ? parsed.filter((e: any) => e.time).map((e: any) => ({ time: e.time }))
-        : [];
+      try {
+        const content = await watchJsonFile.async("string");
+        const parsed = JSON.parse(content);
+        watchHistory = Array.isArray(parsed)
+          ? parsed.filter((e: any) => e.time).map((e: any) => ({ time: e.time }))
+          : [];
+      } catch { /* JSONパース失敗は無視 */ }
     }
   }
 
@@ -142,11 +144,13 @@ export async function parseTakeoutZip(
       "検索履歴.json",
     ]);
     if (searchJsonFile) {
-      const content = await searchJsonFile.async("string");
-      const parsed = JSON.parse(content);
-      searchHistory = Array.isArray(parsed)
-        ? parsed.filter((e: any) => e.time).map((e: any) => ({ time: e.time }))
-        : [];
+      try {
+        const content = await searchJsonFile.async("string");
+        const parsed = JSON.parse(content);
+        searchHistory = Array.isArray(parsed)
+          ? parsed.filter((e: any) => e.time).map((e: any) => ({ time: e.time }))
+          : [];
+      } catch { /* JSONパース失敗は無視 */ }
     }
   }
 
@@ -161,9 +165,12 @@ export async function parseTakeoutZip(
   ]);
   let chromeHistory: any[] = [];
   if (chromeFile) {
-    const content = await chromeFile.async("string");
-    const parsed = JSON.parse(content);
-    chromeHistory = parsed.Browser_History || parsed["Browser History"] || (Array.isArray(parsed) ? parsed : []);
+    try {
+      const content = await chromeFile.async("string");
+      const parsed = JSON.parse(content);
+      chromeHistory = parsed.Browser_History || parsed["Browser History"]
+        || parsed["ブラウザ履歴"] || (Array.isArray(parsed) ? parsed : []);
+    } catch { /* JSONパース失敗は無視 */ }
   }
 
   onProgress?.({ stage: "Google検索履歴を解析中...", percent: 38 });
@@ -175,8 +182,11 @@ export async function parseTakeoutZip(
   ]);
   let searchActivity: any[] = [];
   if (searchActivityFile) {
-    const content = await searchActivityFile.async("string");
-    searchActivity = JSON.parse(content);
+    try {
+      const content = await searchActivityFile.async("string");
+      const parsed = JSON.parse(content);
+      searchActivity = Array.isArray(parsed) ? parsed : [];
+    } catch { /* JSONパース失敗は無視 */ }
   }
 
   onProgress?.({ stage: "フィットネスデータを解析中...", percent: 45 });
@@ -314,15 +324,21 @@ async function parseIndividualFiles(
       }
       case "chrome": {
         onProgress?.({ stage: "Chrome履歴を解析中...", percent: pct });
-        const content = await file.text();
-        const parsed = JSON.parse(content);
-        raw.chromeHistory = parsed.Browser_History || parsed["Browser History"] || (Array.isArray(parsed) ? parsed : []);
+        try {
+          const content = await file.text();
+          const parsed = JSON.parse(content);
+          raw.chromeHistory = parsed.Browser_History || parsed["Browser History"]
+            || parsed["ブラウザ履歴"] || (Array.isArray(parsed) ? parsed : []);
+        } catch { /* JSONパース失敗は無視 */ }
         break;
       }
       case "search-activity": {
         onProgress?.({ stage: "Google検索を解析中...", percent: pct });
-        const content = await file.text();
-        raw.searchActivity = JSON.parse(content);
+        try {
+          const content = await file.text();
+          const parsed = JSON.parse(content);
+          raw.searchActivity = Array.isArray(parsed) ? parsed : [];
+        } catch { /* JSONパース失敗は無視 */ }
         break;
       }
       case "fitness": {
@@ -432,23 +448,71 @@ function parsePayCsv(csv: string): PayEntry[] {
 
 function parseLocationJson(content: string): LocationEntry[] {
   const locations: LocationEntry[] = [];
-  const data = JSON.parse(content);
-  const records: any[] = data.locations || [];
+  try {
+    const data = JSON.parse(content);
+    const records: any[] = data.locations || [];
 
-  // 大量データなので1時間ごとにサンプリング
-  let lastHour = "";
-  for (const loc of records) {
-    const ts = loc.timestamp || (loc.timestampMs ? new Date(parseInt(loc.timestampMs)).toISOString() : null);
-    if (!ts) continue;
+    // 大量データなので1時間ごとにサンプリング
+    let lastHour = "";
+    for (const loc of records) {
+      const ts = loc.timestamp || (loc.timestampMs ? new Date(parseInt(loc.timestampMs)).toISOString() : null);
+      if (!ts) continue;
 
-    const hour = ts.slice(0, 13);
-    if (hour === lastHour) continue;
-    lastHour = hour;
+      const hour = ts.slice(0, 13);
+      if (hour === lastHour) continue;
+      lastHour = hour;
 
-    locations.push({ ts });
-  }
+      locations.push({ ts });
+    }
+  } catch { /* JSONパース失敗は空配列を返す */ }
 
   return locations;
+}
+
+// ============================================================
+// サブスクリプション推定（Google Pay決済から）
+// ============================================================
+
+function estimateSubscriptions(payments: PayEntry[]): {
+  totalAnnual: number;
+  count: number;
+  services: string[];
+} {
+  if (payments.length === 0) return { totalAnnual: 0, count: 0, services: [] };
+
+  // 同一description（サービス名）での決済を集計
+  const serviceMap = new Map<string, { amounts: number[]; dates: string[] }>();
+  for (const pay of payments) {
+    const key = pay.description.trim();
+    if (!key) continue;
+    const entry = serviceMap.get(key) || { amounts: [], dates: [] };
+    if (pay.amount) entry.amounts.push(pay.amount);
+    entry.dates.push(pay.ts);
+    serviceMap.set(key, entry);
+  }
+
+  // 3回以上の定期的な決済をサブスクと推定
+  const subscriptions: { name: string; annualAmount: number }[] = [];
+  for (const [name, { amounts, dates }] of serviceMap) {
+    if (dates.length < 3) continue;
+
+    // 金額が概ね一定か（標準偏差が平均の30%以下）
+    if (amounts.length < 3) continue;
+    const avg = amounts.reduce((a, b) => a + b, 0) / amounts.length;
+    if (avg <= 0) continue;
+    const stddev = Math.sqrt(amounts.reduce((sum, v) => sum + (v - avg) ** 2, 0) / amounts.length);
+    if (stddev / avg > 0.3) continue; // 金額バラツキが大きいものは除外
+
+    // 年額推定: 月額 × 12
+    const annualAmount = Math.round(avg * 12);
+    subscriptions.push({ name, annualAmount });
+  }
+
+  return {
+    totalAnnual: subscriptions.reduce((sum, s) => sum + s.annualAmount, 0),
+    count: subscriptions.length,
+    services: subscriptions.map(s => s.name),
+  };
 }
 
 // ============================================================
@@ -636,7 +700,7 @@ function aggregateData(raw: RawParsedData, onProgress?: ProgressCallback): Parse
   onProgress?.({ stage: "完了", percent: 100 });
 
   return {
-    totalDataPoints: Math.max(totalDataPoints, 1),
+    totalDataPoints,
     sources,
     heatmap,
     peakHour,
@@ -647,11 +711,7 @@ function aggregateData(raw: RawParsedData, onProgress?: ProgressCallback): Parse
       searchCount: searchHistory.length,
       algorithmPercent: ytAlgorithmPercent,
     },
-    subscriptions: {
-      totalAnnual: 0,
-      count: 0,
-      services: [],
-    },
+    subscriptions: estimateSubscriptions(payments),
     dataType: {
       code: typeCode,
       name: typeName,

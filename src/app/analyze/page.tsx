@@ -1,10 +1,11 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import dynamic from "next/dynamic";
 import { ParsedUserData } from "@/lib/types";
 import { parseFiles, ParseProgress } from "@/lib/parsers/takeout-parser";
 import { SAMPLE_DATA } from "@/lib/sample-data";
+import { saveResult, getLatestResult, StoredResult } from "@/lib/storage";
 
 const ScrollReveal = dynamic(() => import("@/components/ui/ScrollReveal"), { ssr: false });
 const FileUpload = dynamic(() => import("@/components/ui/FileUpload"), { ssr: false });
@@ -138,23 +139,118 @@ function TakeoutGuide() {
   );
 }
 
+// 前回結果の表示コンポーネント
+function PreviousResultBanner({ stored, onLoad, onDismiss }: {
+  stored: StoredResult;
+  onLoad: () => void;
+  onDismiss: () => void;
+}) {
+  const date = new Date(stored.analyzedAt);
+  const dateStr = `${date.getFullYear()}/${(date.getMonth() + 1).toString().padStart(2, "0")}/${date.getDate().toString().padStart(2, "0")}`;
+
+  return (
+    <div style={{
+      width: "100%",
+      maxWidth: 420,
+      padding: "14px 18px",
+      background: "rgba(0,229,255,0.06)",
+      border: "1px solid rgba(0,229,255,0.2)",
+      borderRadius: 12,
+      display: "flex",
+      flexDirection: "column",
+      gap: 10,
+    }}>
+      <div style={{
+        fontSize: 12,
+        color: "var(--text2)",
+        fontFamily: "'JetBrains Mono', monospace",
+      }}>
+        前回の解析結果があります
+      </div>
+      <div style={{
+        fontSize: 11,
+        color: "var(--text3)",
+        fontFamily: "'JetBrains Mono', monospace",
+      }}>
+        {dateStr} — {stored.data.totalDataPoints.toLocaleString()}データポイント — {stored.sourcesSummary}
+      </div>
+      <div style={{ display: "flex", gap: 8 }}>
+        <button
+          onClick={onLoad}
+          style={{
+            flex: 1,
+            background: "rgba(0,229,255,0.12)",
+            border: "1px solid rgba(0,229,255,0.3)",
+            borderRadius: 8,
+            padding: "8px 0",
+            color: "var(--cyan)",
+            fontSize: 12,
+            fontFamily: "'JetBrains Mono', monospace",
+            cursor: "pointer",
+            transition: "all 0.2s",
+          }}
+        >
+          前回の結果を見る
+        </button>
+        <button
+          onClick={onDismiss}
+          style={{
+            background: "none",
+            border: "1px solid rgba(255,255,255,0.08)",
+            borderRadius: 8,
+            padding: "8px 14px",
+            color: "var(--text3)",
+            fontSize: 12,
+            fontFamily: "'JetBrains Mono', monospace",
+            cursor: "pointer",
+            transition: "all 0.2s",
+          }}
+        >
+          新規解析
+        </button>
+      </div>
+    </div>
+  );
+}
+
 export default function AnalyzePage() {
   const [data, setData] = useState<ParsedUserData | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const [progress, setProgress] = useState<ParseProgress>({ stage: "", percent: 0 });
   const [error, setError] = useState<string | null>(null);
+  const [previousResult, setPreviousResult] = useState<StoredResult | null>(null);
+  const [dismissed, setDismissed] = useState(false);
+
+  // 起動時にIndexedDBから前回結果を取得
+  useEffect(() => {
+    getLatestResult()
+      .then(result => { if (result) setPreviousResult(result); })
+      .catch(() => { /* IndexedDB未対応環境は無視 */ });
+  }, []);
 
   const handleFilesReady = async (files: File[]) => {
     setIsProcessing(true);
     setError(null);
     try {
       const result = await parseFiles(files, (p) => setProgress(p));
+      // 解析結果をIndexedDBに保存
+      saveResult(result).catch(() => { /* 保存失敗は無視 */ });
       setData(result);
     } catch (err) {
       setError(err instanceof Error ? err.message : "解析に失敗しました");
     } finally {
       setIsProcessing(false);
     }
+  };
+
+  // 結果画面から戻る
+  const handleBack = () => {
+    setData(null);
+    setDismissed(false);
+    // 前回結果を再取得
+    getLatestResult()
+      .then(result => { if (result) setPreviousResult(result); })
+      .catch(() => {});
   };
 
   // Show upload screen if no data yet
@@ -181,6 +277,14 @@ export default function AnalyzePage() {
               好きなデータを好きなだけアップロード<br />
               あるものだけで、あなたを解析します
             </div>
+            {/* 前回結果がある場合のバナー */}
+            {previousResult && !dismissed && (
+              <PreviousResultBanner
+                stored={previousResult}
+                onLoad={() => setData(previousResult.data)}
+                onDismiss={() => setDismissed(true)}
+              />
+            )}
             <FileUpload
               onFilesReady={handleFilesReady}
               isProcessing={isProcessing}
@@ -242,6 +346,28 @@ export default function AnalyzePage() {
       <ScrollReveal />
       <BackgroundParticles />
       <NavDots />
+      {/* 戻るボタン */}
+      <button
+        onClick={handleBack}
+        style={{
+          position: "fixed",
+          top: 20,
+          left: 20,
+          zIndex: 100,
+          background: "rgba(0,0,0,0.5)",
+          border: "1px solid rgba(255,255,255,0.1)",
+          borderRadius: 8,
+          padding: "8px 14px",
+          color: "var(--text2)",
+          fontSize: 12,
+          fontFamily: "'JetBrains Mono', monospace",
+          cursor: "pointer",
+          backdropFilter: "blur(8px)",
+          transition: "all 0.2s",
+        }}
+      >
+        &#x2190; 再解析
+      </button>
       <IntroCard totalDataPoints={data.totalDataPoints} sourceCount={data.sources.length} sources={data.sources} />
       {hasActivity && (
         <RhythmCard heatmap={data.heatmap} peakHour={data.peakHour} nocturnalIndex={data.nocturnalIndex} />
