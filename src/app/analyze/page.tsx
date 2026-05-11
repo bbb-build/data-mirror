@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, type ReactNode } from "react";
 import dynamic from "next/dynamic";
 import { ParsedUserData } from "@/lib/types";
 import { parseFiles, ParseProgress, translateFileReadError } from "@/lib/parsers/takeout-parser";
@@ -21,21 +21,89 @@ const DataValueCard = dynamic(() => import("@/components/cards/DataValueCard"), 
 function TakeoutGuide() {
   const [isOpen, setIsOpen] = useState(true);
 
-  const steps = [
-    { label: "⚠️", text: "最重要 — 全選択しない / フォト・ドライブ・Gmail は外す", sub: "全選択すると数十GB〜100GB超になり、ブラウザで開けません。解析にも不要です" },
-    { label: "1", text: "takeout.google.com を開く", sub: "Googleアカウントでログイン" },
+  type Step = {
+    label: string;
+    text: ReactNode;
+    sub?: ReactNode | null;
+    items?: { name: string; note?: string; highlight?: boolean }[];
+    excludeItems?: { name: string; note?: string }[];
+    youtubeNote?: boolean;
+  };
+
+  const includeItems = [
+    { name: "マイ アクティビティ", note: "最重要 — 検索・閲覧・アシスタントの全ログ", highlight: true },
+    { name: "Chrome", note: "ブラウザ履歴・ブックマーク" },
+    { name: "YouTube と YouTube Music", note: "視聴・検索履歴（※下の注意参照）" },
+    { name: "マップ" },
+    { name: "マップ（マイプレイス）" },
+    { name: "タイムライン", note: "位置情報の時系列" },
+    { name: "カレンダー" },
+    { name: "連絡先" },
+    { name: "Keep" },
+    { name: "ToDo リスト" },
+    { name: "リマインダー" },
+    { name: "メッセージ" },
+    { name: "Fit", note: "フィットネス" },
+    { name: "Google Pay" },
+    { name: "Google Play ストア" },
+    { name: "Google Play ブックス" },
+    { name: "Google Podcasts" },
+    { name: "Google ショッピング" },
+    { name: "Google ヘルプ コミュニティ" },
+    { name: "Google アカウント" },
+    { name: "Discover" },
+    { name: "NotebookLM" },
+    { name: "Saved" },
+    { name: "Search Contributions" },
+    { name: "Search Notifications" },
+    { name: "アラート" },
+    { name: "グループ" },
+    { name: "ニュース" },
+    { name: "プロフィール" },
+    { name: "購入と予約" },
+  ];
+
+  const excludeItems = [
+    { name: "Google フォト", note: "数十GB〜" },
+    { name: "ドライブ", note: "数GB〜" },
+    { name: "メール (Gmail)", note: "MBOX、数GB〜" },
+    { name: "Google Meet", note: "録画含む可能性" },
+    { name: "Nest" },
+    { name: "フロー", note: "画像・動画" },
+    { name: "ストリートビュー", note: "画像・動画" },
+    { name: "Google Earth" },
+    { name: "Phone Audio", note: "音声" },
+    { name: "Pinpoint" },
+    { name: "Google Pixel", note: "診断データ" },
+    { name: "Fitbit", note: "Fitと重複" },
+  ];
+
+  const steps: Step[] = [
+    { label: "⚠️", text: "最重要 — 全選択しない", sub: "全選択すると数十GB〜100GB超になり、ブラウザで開けません。下の推奨セットだけを選べば通常 50MB〜200MB に収まります" },
+    {
+      label: "1",
+      text: (
+        <>
+          <a
+            href="https://takeout.google.com"
+            target="_blank"
+            rel="noopener noreferrer"
+            style={{ color: "var(--cyan)", textDecoration: "underline" }}
+          >
+            takeout.google.com
+          </a>
+          {" "}を開く
+        </>
+      ),
+      sub: "Googleアカウントでログイン",
+    },
     { label: "2", text: "「選択をすべて解除」をクリック", sub: "一度全てのチェックを外す（ここがスタート地点）" },
-    { label: "3", text: "以下だけを選択してチェック", sub: null, items: [
-      { name: "YouTube と YouTube Music", note: "推奨 — 視聴・検索履歴" },
-      { name: "Chrome", note: "推奨 — ブラウザ閲覧履歴" },
-      { name: "マイ アクティビティ", note: "推奨 — Google検索履歴" },
-      { name: "Fit", note: "任意 — フィットネスデータ" },
-      { name: "Google Pay", note: "任意 — 決済履歴" },
-      { name: "ロケーション履歴", note: "任意 — 位置情報" },
-    ]},
-    { label: "4", text: "Google画面で「次のステップ」→「エクスポートを作成」", sub: "Googleがあなたのデータを1つのZIPにまとめる" },
-    { label: "5", text: "Googleからメールが届く", sub: "ZIPのダウンロードリンク付き（数分〜数時間）" },
-    { label: "6", text: "ダウンロードしたZIPをこの画面にドロップ", sub: "端末ローカルに保存したものを使用（クラウド上のファイルは参照切れを起こします）" },
+    { label: "3", text: "✅ 以下にチェックを付ける（推奨セット）", sub: "履歴・テキスト中心。合計でも通常 200MB 以下", items: includeItems },
+    { label: "4", text: "❌ 以下は必ず外す（重量級）", sub: "メディア中心で容量が爆発する。解析にもほぼ寄与しない", excludeItems },
+    { label: "⚠️", text: "YouTube の選び方（チェックする場合）", sub: "「すべての YouTube データが含まれます」横のボタンから選択画面を開き、history / subscriptions / playlists / comments / likes だけにチェック。videos（自分でアップした動画）と music-uploads は必ず外す", youtubeNote: true },
+    { label: "5", text: "「次のステップ」→「エクスポートを作成」", sub: "Googleがデータを1つのZIPにまとめる" },
+    { label: "6", text: "Googleからメールが届く", sub: "ZIPのダウンロードリンク付き（数分〜数時間）" },
+    { label: "7", text: "ダウンロードしたZIPをこの画面にドロップ", sub: "端末ローカルに保存したものを使用（クラウド上のファイルは参照切れを起こします）" },
     { label: "💡", text: "ZIPが大きすぎる場合", sub: "解凍して個別ファイル（HTML/JSON/CSV）を直接アップロードできます" },
   ];
 
@@ -112,7 +180,11 @@ function TakeoutGuide() {
                 )}
                 {step.items && (
                   <div style={{
-                    marginTop: 6,
+                    marginTop: 8,
+                    padding: "10px 12px",
+                    background: "rgba(0,255,140,0.04)",
+                    border: "1px solid rgba(0,255,140,0.15)",
+                    borderRadius: 8,
                     display: "flex",
                     flexDirection: "column",
                     gap: 4,
@@ -123,10 +195,45 @@ function TakeoutGuide() {
                         alignItems: "baseline",
                         gap: 6,
                         fontSize: 11,
+                        padding: item.highlight ? "4px 6px" : "0",
+                        background: item.highlight ? "rgba(0,255,140,0.08)" : "transparent",
+                        borderRadius: item.highlight ? 4 : 0,
                       }}>
                         <span style={{ color: "var(--green)", fontSize: 10 }}>&#x2713;</span>
+                        <span style={{
+                          color: item.highlight ? "var(--green)" : "var(--text2)",
+                          fontWeight: item.highlight ? 600 : 400,
+                        }}>{item.name}</span>
+                        {item.note && (
+                          <span style={{ color: "var(--text3)", fontSize: 9 }}>— {item.note}</span>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+                {step.excludeItems && (
+                  <div style={{
+                    marginTop: 8,
+                    padding: "10px 12px",
+                    background: "rgba(255,80,80,0.04)",
+                    border: "1px solid rgba(255,80,80,0.18)",
+                    borderRadius: 8,
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: 4,
+                  }}>
+                    {step.excludeItems.map((item, j) => (
+                      <div key={j} style={{
+                        display: "flex",
+                        alignItems: "baseline",
+                        gap: 6,
+                        fontSize: 11,
+                      }}>
+                        <span style={{ color: "#ff6464", fontSize: 10 }}>&#x2715;</span>
                         <span style={{ color: "var(--text2)" }}>{item.name}</span>
-                        <span style={{ color: "var(--text3)", fontSize: 9 }}>— {item.note}</span>
+                        {item.note && (
+                          <span style={{ color: "var(--text3)", fontSize: 9 }}>— {item.note}</span>
+                        )}
                       </div>
                     ))}
                   </div>
