@@ -37,6 +37,40 @@ interface RawParsedData {
 }
 
 // ============================================================
+// エラー翻訳
+// ============================================================
+
+/**
+ * ブラウザネイティブのFile APIエラー（NotReadableError / InvalidStateError等）を
+ * ユーザー向けの日本語メッセージに翻訳する。
+ * Android × 大容量ZIP × クラウドストレージ参照の組み合わせで頻出する。
+ */
+export function translateFileReadError(err: unknown): Error {
+  const msg = err instanceof Error ? err.message : String(err);
+  const name = err instanceof Error ? err.name : "";
+
+  const isFileReadIssue =
+    /NotReadableError|InvalidStateError|NotFoundError|SecurityError/i.test(name) ||
+    /could not be read|permission|reference to a file/i.test(msg);
+
+  if (isFileReadIssue) {
+    return new Error(
+      "ファイルの読み込みに失敗しました。\n\n" +
+      "考えられる原因:\n" +
+      "・写真・動画を含む大容量ZIPでブラウザのメモリが足りない\n" +
+      "・クラウド（Drive等）上のファイル参照が処理中に切れた\n" +
+      "・ファイル選択後にZIPが移動・削除・同期で更新された\n\n" +
+      "対処:\n" +
+      "1. Takeoutで「Google フォト」「ドライブ」のチェックを外して再取得（ZIPが激減します）\n" +
+      "2. 端末ローカルに保存したZIPを直接アップロード\n" +
+      "3. それでもダメな場合はPCブラウザから試す"
+    );
+  }
+
+  return err instanceof Error ? err : new Error(String(err));
+}
+
+// ============================================================
 // メインエントリポイント
 // ============================================================
 
@@ -46,10 +80,12 @@ export async function parseFiles(
 ): Promise<ParsedUserData> {
   const zipFile = files.find(f => f.name.toLowerCase().endsWith(".zip"));
   if (zipFile) {
-    // ブラウザメモリ上限を考慮（4GB超はクラッシュする）
+    // ブラウザメモリ上限を考慮（4GB超はクラッシュ確実、2GB超もモバイルでは厳しい）
     if (zipFile.size > 4 * 1024 * 1024 * 1024) {
       throw new Error(
-        "ZIPファイルが大きすぎます（4GB超）。Takeoutで写真・動画を除外するか、個別ファイルをアップロードしてください。"
+        "ZIPファイルが大きすぎます（4GB超）。\n" +
+        "Takeoutで「Google フォト」「ドライブ」のチェックを外して再取得してください。" +
+        "解析に必要なのは履歴・検索・閲覧データのみで、これらは合計しても通常200MB以下です。"
       );
     }
     return parseTakeoutZip(zipFile, onProgress);
@@ -67,7 +103,12 @@ export async function parseTakeoutZip(
 ): Promise<ParsedUserData> {
   onProgress?.({ stage: "ZIPを展開中...", percent: 5 });
 
-  const zip = await JSZip.loadAsync(file);
+  let zip: JSZip;
+  try {
+    zip = await JSZip.loadAsync(file);
+  } catch (err) {
+    throw translateFileReadError(err);
+  }
 
   // ファイル検索（ネストされたTakeout/プレフィックスやロケール違いに対応）
   const findFile = (patterns: string[]): JSZip.JSZipObject | null => {
