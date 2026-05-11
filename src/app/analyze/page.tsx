@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import dynamic from "next/dynamic";
 import { ParsedUserData } from "@/lib/types";
-import { parseFiles, ParseProgress } from "@/lib/parsers/takeout-parser";
+import { parseFiles, ParseProgress, translateFileReadError } from "@/lib/parsers/takeout-parser";
 import { SAMPLE_DATA } from "@/lib/sample-data";
 import { saveResult, getLatestResult, StoredResult } from "@/lib/storage";
 
@@ -32,9 +32,10 @@ function TakeoutGuide() {
       { name: "Google Pay", note: "任意 — 決済履歴" },
       { name: "ロケーション履歴", note: "任意 — 位置情報" },
     ]},
+    { label: "⚠️", text: "「Google フォト」「ドライブ」は必ずチェックを外す", sub: "解析に不要なうえ、ZIPが数GBに膨らみブラウザがクラッシュします" },
     { label: "4", text: "Google画面で「次のステップ」→「エクスポートを作成」", sub: "Googleがあなたのデータを1つのZIPにまとめる" },
     { label: "5", text: "Googleからメールが届く", sub: "ZIPのダウンロードリンク付き（数分〜数時間）" },
-    { label: "6", text: "ダウンロードしたZIPをこの画面にドロップ", sub: "Data Mirrorが解析します" },
+    { label: "6", text: "ダウンロードしたZIPをこの画面にドロップ", sub: "端末ローカルに保存したものを使用（クラウド上のファイルは参照切れを起こします）" },
     { label: "💡", text: "ZIPが大きすぎる場合", sub: "解凍して個別ファイル（HTML/JSON/CSV）を直接アップロードできます" },
   ];
 
@@ -237,7 +238,9 @@ export default function AnalyzePage() {
       saveResult(result).catch(() => { /* 保存失敗は無視 */ });
       setData(result);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "解析に失敗しました");
+      // ブラウザネイティブのFile APIエラーをユーザー向けに翻訳
+      const translated = translateFileReadError(err);
+      setError(translated.message);
     } finally {
       setIsProcessing(false);
     }
@@ -276,6 +279,20 @@ export default function AnalyzePage() {
             <div className="card-sub" style={{ marginBottom: 8 }}>
               好きなデータを好きなだけアップロード<br />
               あるものだけで、あなたを解析します
+            </div>
+            <div style={{
+              fontSize: 11,
+              color: "var(--amber)",
+              fontFamily: "'JetBrains Mono', monospace",
+              maxWidth: 420,
+              textAlign: "center",
+              opacity: 0.85,
+              lineHeight: 1.6,
+            }}>
+              ⚠️ Takeout取得時は「Google フォト」「ドライブ」のチェックを外してください<br />
+              <span style={{ color: "var(--text3)", fontSize: 10 }}>
+                解析に不要・ZIPが数GBに膨らみブラウザがクラッシュします
+              </span>
             </div>
             {/* 前回結果がある場合のバナー */}
             {previousResult && !dismissed && (
