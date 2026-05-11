@@ -19,12 +19,13 @@ const PortraitCard = dynamic(() => import("@/components/cards/PortraitCard"), { 
 const DataValueCard = dynamic(() => import("@/components/cards/DataValueCard"), { ssr: false });
 
 function TakeoutGuide() {
-  const [isOpen, setIsOpen] = useState(false);
+  const [isOpen, setIsOpen] = useState(true);
 
   const steps = [
+    { label: "⚠️", text: "最重要 — 全選択しない / フォト・ドライブ・Gmail は外す", sub: "全選択すると数十GB〜100GB超になり、ブラウザで開けません。解析にも不要です" },
     { label: "1", text: "takeout.google.com を開く", sub: "Googleアカウントでログイン" },
-    { label: "2", text: "「選択をすべて解除」をクリック", sub: "一度全てのチェックを外す" },
-    { label: "3", text: "以下を選択してチェック", sub: null, items: [
+    { label: "2", text: "「選択をすべて解除」をクリック", sub: "一度全てのチェックを外す（ここがスタート地点）" },
+    { label: "3", text: "以下だけを選択してチェック", sub: null, items: [
       { name: "YouTube と YouTube Music", note: "推奨 — 視聴・検索履歴" },
       { name: "Chrome", note: "推奨 — ブラウザ閲覧履歴" },
       { name: "マイ アクティビティ", note: "推奨 — Google検索履歴" },
@@ -32,7 +33,6 @@ function TakeoutGuide() {
       { name: "Google Pay", note: "任意 — 決済履歴" },
       { name: "ロケーション履歴", note: "任意 — 位置情報" },
     ]},
-    { label: "⚠️", text: "「Google フォト」「ドライブ」は必ずチェックを外す", sub: "解析に不要なうえ、ZIPが数GBに膨らみブラウザがクラッシュします" },
     { label: "4", text: "Google画面で「次のステップ」→「エクスポートを作成」", sub: "Googleがあなたのデータを1つのZIPにまとめる" },
     { label: "5", text: "Googleからメールが届く", sub: "ZIPのダウンロードリンク付き（数分〜数時間）" },
     { label: "6", text: "ダウンロードしたZIPをこの画面にドロップ", sub: "端末ローカルに保存したものを使用（クラウド上のファイルは参照切れを起こします）" },
@@ -59,7 +59,7 @@ function TakeoutGuide() {
           transition: "all 0.3s",
         }}
       >
-        <span>データの取得方法</span>
+        <span>データの取得方法（必ずお読みください）</span>
         <span style={{
           transform: isOpen ? "rotate(180deg)" : "rotate(0deg)",
           transition: "transform 0.3s",
@@ -277,22 +277,37 @@ export default function AnalyzePage() {
               あなたのデジタルDNAを解析
             </div>
             <div className="card-sub" style={{ marginBottom: 8 }}>
-              好きなデータを好きなだけアップロード<br />
+              必要な履歴データだけアップロード<br />
               あるものだけで、あなたを解析します
             </div>
             <div style={{
-              fontSize: 11,
-              color: "var(--amber)",
-              fontFamily: "'JetBrains Mono', monospace",
+              width: "100%",
               maxWidth: 420,
-              textAlign: "center",
-              opacity: 0.85,
+              padding: "14px 16px",
+              background: "rgba(255,107,107,0.08)",
+              border: "1px solid rgba(255,107,107,0.35)",
+              borderRadius: 12,
+              fontFamily: "'JetBrains Mono', monospace",
               lineHeight: 1.6,
             }}>
-              ⚠️ Takeout取得時は「Google フォト」「ドライブ」のチェックを外してください<br />
-              <span style={{ color: "var(--text3)", fontSize: 10 }}>
-                解析に不要・ZIPが数GBに膨らみブラウザがクラッシュします
-              </span>
+              <div style={{
+                fontSize: 12,
+                fontWeight: 600,
+                color: "var(--coral)",
+                marginBottom: 6,
+              }}>
+                ⚠️ Takeoutでは「全選択」しないでください
+              </div>
+              <div style={{ fontSize: 11, color: "var(--text2)" }}>
+                全選択すると <strong style={{ color: "var(--coral)" }}>数十GB〜100GB超</strong> になり、ブラウザで開けません。
+              </div>
+              <div style={{ fontSize: 11, color: "var(--text2)", marginTop: 4 }}>
+                以下は必ず<strong style={{ color: "var(--coral)" }}>チェックを外す</strong>:
+                <span style={{ color: "var(--text3)" }}> Google フォト / ドライブ / Gmail</span>
+              </div>
+              <div style={{ fontSize: 10, color: "var(--text3)", marginTop: 6 }}>
+                履歴系（YouTube・Chrome・マイ アクティビティ等）だけなら通常 200MB 以下です
+              </div>
             </div>
             {/* 前回結果がある場合のバナー */}
             {previousResult && !dismissed && (
